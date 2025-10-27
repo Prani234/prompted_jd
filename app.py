@@ -155,7 +155,15 @@ def generate_job_intro(job_json):
 # ---------------- Streamlit UI ----------------
 st.title("📋 Job Description Field Extractor + Audio Intro (Groq LLM)")
 
-uploaded_file = st.file_uploader("Upload a Job Description file (PDF, DOCX, or TXT)", type=["pdf", "docx", "txt"])
+# Initialize session state
+if "job_json" not in st.session_state:
+    st.session_state.job_json = None
+if "job_intro" not in st.session_state:
+    st.session_state.job_intro = None
+
+uploaded_file = st.file_uploader(
+    "Upload a Job Description file (PDF, DOCX, or TXT)", type=["pdf", "docx", "txt"]
+)
 
 if uploaded_file:
     file_ext = uploaded_file.name.split(".")[-1].lower()
@@ -175,19 +183,30 @@ if uploaded_file:
 
         if st.button("🔍 Extract Job Fields"):
             job_json = extract_job_fields(job_text)
+            st.session_state.job_json = job_json
+            st.session_state.job_intro = None  # reset intro if re-extracted
+
+        # Display extracted job fields if already available
+        if st.session_state.job_json:
             st.subheader("📊 Extracted Job Information (JSON)")
-            st.json(job_json)
+            st.json(st.session_state.job_json)
 
-            if "error" not in job_json:
-                st.subheader("🎙 Generate Job Introduction Script")
-                job_intro = generate_job_intro(job_json)
-                st.text_area("Generated Introduction Script", job_intro, height=150)
+            if "error" not in st.session_state.job_json:
+                if st.button("🎙 Generate Job Introduction Script"):
+                    job_intro = generate_job_intro(st.session_state.job_json)
+                    st.session_state.job_intro = job_intro
 
-                if st.button("🔊 Convert to Audio"):
-                    try:
-                        audio_path = os.path.join(UPLOAD_PATH, "job_intro.wav")
-                        tts = TTS(model_name="tts_models/en/ljspeech/tacotron2-DDC", progress_bar=False, gpu=False)
-                        tts.tts_to_file(text=job_intro, file_path=audio_path)
-                        st.audio(audio_path)
-                    except Exception as e:
-                        st.error(f"TTS conversion failed: {str(e)}")
+                # Display intro if available
+                if st.session_state.job_intro:
+                    st.subheader("🎙 Generated Job Introduction Script")
+                    st.text_area("Generated Introduction Script", st.session_state.job_intro, height=150)
+
+                    if st.button("🔊 Convert to Audio"):
+                        try:
+                            audio_path = os.path.join(UPLOAD_PATH, "job_intro.wav")
+                            tts = TTS(model_name="tts_models/en/ljspeech/tacotron2-DDC", progress_bar=False, gpu=False)
+                            tts.tts_to_file(text=st.session_state.job_intro, file_path=audio_path)
+                            st.audio(audio_path)
+                            st.success("✅ Audio generated successfully!")
+                        except Exception as e:
+                            st.error(f"TTS conversion failed: {str(e)}")
