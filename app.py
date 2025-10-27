@@ -40,37 +40,53 @@ def extract_text(file_path, file_type="pdf"):
 # ---------------- Job Info Extractor (Groq LLM) ----------------
 def extract_job_fields(job_text):
     """
-    Use Groq LLM to extract structured job information
-    matching the exact fields specified.
+    Use Groq LLM to extract *detailed* structured job information.
+    Enforces full JSON schema, strong completeness, and detail preservation.
     """
+    # Clean text for better parsing
+    job_text = (
+        job_text.replace("·", "-")
+        .replace("•", "-")
+        .replace("\n\n", "\n")
+        .replace("\t", " ")
+        .strip()
+    )
+
     prompt = f"""
-You are an expert job information extraction assistant.
+You are an expert at structured information extraction from job descriptions.
+Read the text below carefully and extract **ALL** requested fields with maximum detail.
 
-From the job description below, extract and return a structured JSON object
-with the following fields:
+Return a valid JSON object including EVERY FIELD even if some values are missing.
+If a field is not explicitly mentioned, return null or an empty list.
+Include all subpoints and technical keywords when listing skills, tools, or duties.
 
-- job_title
-- company_name
-- location
-- employment_type
-- seniority_level
-- hard_skills
-- soft_skills
-- certifications
-- tools
-- experience
-- education_level
-- duties_and_responsibilities
-- preferred_skills
-- communication_skills
-- language
-- salary
+Allowed inferences:
+- If job mentions 'Experienced', 'Senior', 'Lead', etc. → infer 'seniority_level'.
+- If mentions 'WFO', 'Remote', 'Hybrid' → infer 'employment_type'.
+- If no company name is mentioned, set to null.
+- Always separate hard_skills (technical) and soft_skills (interpersonal).
+- Include complete sentences for duties_and_responsibilities and preferred_skills.
+- Include all programming languages, tools, and frameworks mentioned anywhere.
 
-Rules:
-- Use lists for fields like skills, certifications, tools, or languages.
-- If a field is not present, return null or an empty list.
-- Maintain JSON validity strictly — no explanations or extra text.
-- Do not infer or guess beyond the text; extract only what is clearly mentioned.
+Return **only valid JSON**, strictly following this schema:
+{{
+  "job_title": "",
+  "company_name": "",
+  "location": "",
+  "employment_type": "",
+  "seniority_level": "",
+  "hard_skills": [],
+  "soft_skills": [],
+  "certifications": [],
+  "tools": [],
+  "experience": "",
+  "education_level": "",
+  "duties_and_responsibilities": [],
+  "preferred_skills": [],
+  "communication_skills": "",
+  "language": [],
+  "salary": ""
+}}
 
 Job Description:
 \"\"\"{job_text}\"\"\"
@@ -82,25 +98,28 @@ Job Description:
         "model": "llama-3.3-70b-versatile",
         "messages": [{"role": "user", "content": prompt}],
         "temperature": 0,
-        "max_tokens": 1200,
+        "max_tokens": 1800,
     }
 
     try:
-        response = requests.post(url, headers=headers, json=data, timeout=30)
+        response = requests.post(url, headers=headers, json=data, timeout=60)
         response.raise_for_status()
         content = response.json()["choices"][0]["message"]["content"]
+
+        # Try to extract the JSON content robustly
         try:
             return json.loads(content)
         except json.JSONDecodeError:
-            # Attempt to recover JSON from text
             import re
             json_match = re.search(r"\{[\s\S]*\}", content)
             if json_match:
                 return json.loads(json_match.group(0))
             else:
                 return {"error": "No valid JSON detected", "raw_output": content}
+
     except Exception as e:
         return {"error": str(e)}
+
 
 
 # ---------------- Job Intro Script ----------------
