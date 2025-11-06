@@ -1,6 +1,0 @@
-streamlit
-PyPDF2
-python-docx
-requests
-python-dotenv
-TTS
