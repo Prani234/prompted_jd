@@ -7,6 +7,12 @@ import requests
 from dotenv import load_dotenv
 from TTS.api import TTS
 
+from langchain_groq import ChatGroq
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_community.chat_message_histories import StreamlitChatMessageHistory
+from langchain_core.runnables.history import RunnableWithMessageHistory
+
+
 # ---------------- Load environment variables ----------------
 load_dotenv()
 api_key = os.environ.get("GROQ_API_KEY")
@@ -15,7 +21,12 @@ GROQ_API_BASE = "https://api.groq.com/openai/v1"
 UPLOAD_PATH = "__DATA__"
 os.makedirs(UPLOAD_PATH, exist_ok=True)
 
+st.set_page_config(page_title="AI Job Description Assistant", layout="wide")
+st. title("🤖 AI Job Description Assistant")
+
+
 # ---------------- Text Extraction ----------------
+
 def extract_text(file_path, file_type="pdf"):
     """Extract text from PDF, DOCX, or TXT."""
     text = ""
@@ -153,7 +164,7 @@ def generate_job_intro(job_json):
 
 
 # ---------------- Streamlit UI ----------------
-st.title("📋 Job Description Field Extractor + Audio Intro (Groq LLM)")
+st.header("Step 1: Upload Job Description")
 
 # Initialize session state
 if "job_json" not in st.session_state:
